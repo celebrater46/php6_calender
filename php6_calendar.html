@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>PHP6 カレンダー編</title>
+</head>
+<body>
+  <h1>PHP6・カレンダー編</h1>
+  <p>PHPのオブジェクトには下準備が必要？</p>
+  <p>class POST { ... }</p>
+  <p>$post = new Post();</p>
+
+  <h2>index.php</h2>
+  <p>&lt;?php<br>
+    <br>
+    require &amp;quot;calendar.php&amp;quot;;<br>
+    <br>
+    function h($s) {<br>
+      return htmlspecialchars($s, ENT_QUOTES, &amp;quot;UTF-8&amp;quot;);<br>
+    }<br>
+    <br>
+    $cal = new \MyApp\Calendar(); // new 忘れてたよ<br>
+    <br>
+    ?&gt;<br>
+    &lt;!DOCTYPE html&gt;<br>
+    &lt;html lang=&amp;quot;ja&amp;quot;&gt;<br>
+    &lt;head&gt;<br>
+      &lt;meta charset=&amp;quot;utf-8&amp;quot;&gt;<br>
+      &lt;title&gt;カレンダー&lt;/title&gt;<br>
+      &lt;link rel=&amp;quot;stylesheet&amp;quot; href=&amp;quot;styles.css&amp;quot;&gt;<br>
+    &lt;/head&gt;<br>
+    &lt;body&gt;<br>
+      &lt;table&gt;<br>
+        &lt;thead&gt;<br>
+          &lt;tr&gt;<br>
+            &lt;!-- 前月を表示。出力時にはエスケープしたいので h という関数を使う --&gt;<br>
+            &lt;!-- Lesson 12 から別ファイルに移したため、作成したインスタンス $cal で呼び出し。 --&gt;<br>
+            &lt;th&gt;&lt;a href=&amp;quot;/?t=&lt;?php echo h($cal-&gt;prev); ?&gt;&amp;quot;&gt;&amp;laquo;&lt;/a&gt;&lt;/th&gt;<br>
+            &lt;th colspan=&amp;quot;5&amp;quot;&gt;&lt;?php echo h($cal-&gt;yearMonth); ?&gt;&lt;/th&gt;<br>
+            &lt;th&gt;&lt;a href=&amp;quot;/?t=&lt;?php echo h($cal-&gt;next); ?&gt;&amp;quot;&gt;&amp;raquo;&lt;/a&gt;&lt;/th&gt;<br>
+          &lt;/tr&gt;<br>
+        &lt;/thead&gt;<br>
+        &lt;tbody&gt;<br>
+          &lt;tr&gt;<br>
+            &lt;td&gt;SUN&lt;/td&gt;<br>
+            &lt;td&gt;MON&lt;/td&gt;<br>
+            &lt;td&gt;TUE&lt;/td&gt;<br>
+            &lt;td&gt;WED&lt;/td&gt;<br>
+            &lt;td&gt;THU&lt;/td&gt;<br>
+            &lt;td&gt;FRI&lt;/td&gt;<br>
+            &lt;td&gt;SAT&lt;/td&gt;<br>
+          &lt;/tr&gt;<br>
+          &lt;?php echo $cal-&gt;show(); ?&gt;<br>
+          &lt;!-- &lt;tr&gt;<br>
+            &lt;td class=&amp;quot;youbi-0&amp;quot;&gt;1&lt;/td&gt;<br>
+            &lt;td class=&amp;quot;youbi-1&amp;quot;&gt;2&lt;/td&gt;<br>
+            &lt;td class=&amp;quot;youbi-2&amp;quot;&gt;3&lt;/td&gt;<br>
+            &lt;td class=&amp;quot;youbi-3&amp;quot;&gt;4&lt;/td&gt;<br>
+            &lt;td class=&amp;quot;youbi-4 today&amp;quot;&gt;5&lt;/td&gt;<br>
+            &lt;td class=&amp;quot;youbi-5&amp;quot;&gt;6&lt;/td&gt;<br>
+            &lt;td class=&amp;quot;youbi-6&amp;quot;&gt;7&lt;/td&gt;<br>
+          &lt;/tr&gt;<br>
+          &lt;tr&gt;<br>
+            &lt;td class=&amp;quot;youbi-0&amp;quot;&gt;30&lt;/td&gt;<br>
+            &lt;td class=&amp;quot;youbi-1&amp;quot;&gt;31&lt;/td&gt;<br>
+            &lt;td class=&amp;quot;gray&amp;quot;&gt;1&lt;/td&gt;<br>
+            &lt;td class=&amp;quot;gray&amp;quot;&gt;2&lt;/td&gt;<br>
+            &lt;td class=&amp;quot;gray&amp;quot;&gt;3&lt;/td&gt;<br>
+            &lt;td class=&amp;quot;gray&amp;quot;&gt;4&lt;/td&gt;<br>
+            &lt;td class=&amp;quot;gray&amp;quot;&gt;5&lt;/td&gt;<br>
+          &lt;/tr&gt; --&gt;<br>
+        &lt;/tbody&gt;<br>
+        &lt;tfoot&gt;<br>
+          &lt;tr&gt;<br>
+            &lt;th colspan=&amp;quot;7&amp;quot;&gt;&lt;a href=&amp;quot;/&amp;quot;&gt;Today&lt;/a&gt;&lt;/th&gt;<br>
+          &lt;/tr&gt;<br>
+        &lt;/tfoot&gt;<br>
+      &lt;/table&gt;<br>
+    &lt;/body&gt;<br>
+    &lt;/html&gt;</p>
+
+    <h2>calendar.php</h2>
+    <p>&lt;?php<br>
+      <br>
+      namespace MyApp;<br>
+      <br>
+      // クラスを使えるようになるとコードがすっきりする上に、拡張性の高いコードが書けるようになる。<br>
+      class Calendar {<br>
+        public $prev;<br>
+        public $next;<br>
+        public $yearMonth;<br>
+        private $_thisMonth;<br>
+      <br>
+        public function __construct() {<br>
+          try {<br>
+            // t がセットされていない、または日付形式が xxxx-xx でない場合の処理<br>
+            if(!isset($_GET[&amp;quot;t&amp;quot;]) || !preg_match(&amp;quot;/\A\d{4}-\d{2}\z/&amp;quot;, $_GET[&amp;quot;t&amp;quot;])) {<br>
+              // namespace（名前空間）を使う場合、PHPに標準で用意されているException, DateTime などのクラスは一番上位の namespace から呼び出さなければならないため、最初に \ を入れる<br>
+              throw new \Exception(); <br>
+            }<br>
+            $this-&gt;_thisMonth = new \DateTime($_GET[&amp;quot;t&amp;quot;]);<br>
+          } catch (\Exception $e) {<br>
+            $this-&gt;_thisMonth = new \DateTime(&amp;quot;first day of this month&amp;quot;); // xampp だとこっち出る（?t=1985-01で改変可）<br>
+          }<br>
+          $this-&gt;prev = $this-&gt;_createPrevLink(); // プライベートメソッドにはアンダーバーで区別を<br>
+          $this-&gt;next = $this-&gt;_createNextLink();<br>
+          $this-&gt;yearMonth = $this-&gt;_thisMonth-&gt;format(&amp;quot;F Y&amp;quot;);<br>
+        }<br>
+      <br>
+        private function _createPrevLink() {<br>
+          $dt = clone $this-&gt;_thisMonth;<br>
+          return $dt-&gt;modify(&amp;quot;-1 month&amp;quot;)-&gt;format(&amp;quot;Y-m&amp;quot;);<br>
+        }<br>
+      <br>
+        private function _createNextLink() {<br>
+          $dt = clone $this-&gt;_thisMonth;<br>
+          return $dt-&gt;modify(&amp;quot;+1 month&amp;quot;)-&gt;format(&amp;quot;Y-m&amp;quot;);<br>
+        }<br>
+      <br>
+        public function show() {<br>
+          $tail = $this-&gt;_getTail();<br>
+          $body = $this-&gt;_getBody();<br>
+          $head = $this-&gt;_getHead();<br>
+          $html = &amp;quot;&lt;tr&gt;&amp;quot; . $tail . $body . $head . &amp;quot;&lt;/tr&gt;&amp;quot;;<br>
+          echo $html; // 忘れてた（）<br>
+        }<br>
+      <br>
+        // 名前空間とプロパティ（this）を追加、return で値を返す<br>
+        private function _getTail() {<br>
+          // 先月の日付を追加する処理<br>
+          $tail = &amp;quot;&amp;quot;;<br>
+          $lastDayOfPrevMonth = new \DateTime(&amp;quot;last day of &amp;quot; . $this-&gt;yearMonth . &amp;quot; -1 month&amp;quot;);<br>
+          while ($lastDayOfPrevMonth-&gt;format(&amp;quot;w&amp;quot;) &lt; 6) {<br>
+            $tail = sprintf(<br>
+              &amp;quot;&lt;td class='gray'&gt;%d&lt;/td&gt;&amp;quot;,<br>
+              $lastDayOfPrevMonth-&gt;format(&amp;quot;d&amp;quot;)<br>
+            ) . $tail;<br>
+            $lastDayOfPrevMonth-&gt;sub(new \DateInterval(&amp;quot;P1D&amp;quot;));<br>
+          }<br>
+          return $tail;<br>
+        }<br>
+      <br>
+        private function _getBody() {<br>
+          $body = &amp;quot;&amp;quot;;<br>
+      <br>
+          // DatePeriod() 特定の機関の日付オブジェクトを作る<br>
+          $period = new \DatePeriod(<br>
+            // new DateTime(&amp;quot;first day of this month&amp;quot;), // 文字列で。割と柔軟に解釈してくれる。<br>
+            new \DateTime(&amp;quot;first day of &amp;quot; . $this-&gt;yearMonth),<br>
+            new \DateInterval(&amp;quot;P1D&amp;quot;), // 日付間隔を1日ごとに<br>
+            // new DateTime(&amp;quot;first day of next month&amp;quot;) // 終わりの指定（翌月初日は含まない）<br>
+            new \DateTime(&amp;quot;first day of &amp;quot; . $this-&gt;yearMonth . &amp;quot; +1 month&amp;quot;) // next month<br>
+          );<br>
+          <br>
+          $today = new \DateTime(&amp;quot;today&amp;quot;);<br>
+          foreach ($period as $day) {<br>
+            // 7 の倍数時に行替えタグを挿入<br>
+            if ($day-&gt;format(&amp;quot;w&amp;quot;) === &amp;quot;0&amp;quot;) {<br>
+              $body .= &amp;quot;&lt;/tr&gt;&lt;tr&gt;&amp;quot;;<br>
+            }<br>
+            $todayClass = ($day-&gt;format(&amp;quot;Y-m-d&amp;quot;) === $today-&gt;format(&amp;quot;Y-m-d&amp;quot;)) ? &amp;quot;today&amp;quot; : &amp;quot;&amp;quot;;<br>
+          <br>
+            // format() は 変数の値を任意の書式で表示する。「d = 01 to 31, j = 1 to 31, w = 曜日 0 to 6, m = 月 1 to 12, M = 月 Jan to Dec, 詳しくは[https://www.php.net/manual/ja/function.date.php]<br>
+            $body .= sprintf(<br>
+              // &amp;quot;&lt;td class='youbi_%d'&gt;%d&lt;/td&gt;&amp;quot;, [%s] が抜けていたため、カレンダーの数字が全て 0 になってしまった。%s は文字列指定のはずだけど、これがないと何で0になるのか……%d が足りないならまだわかるんだけど。<br>
+              &amp;quot;&lt;td class='youbi_%d %s'&gt;%d&lt;/td&gt;&amp;quot;,<br>
+              $day-&gt;format(&amp;quot;w&amp;quot;),<br>
+              $todayClass, $day-&gt;format(&amp;quot;d&amp;quot;) // JS と違って最後にカンマ入れるとバグる<br>
+            );<br>
+          }<br>
+          return $body;<br>
+        }<br>
+      <br>
+        private function _getHead() {<br>
+          $head = &amp;quot;&amp;quot;;<br>
+          $firstDayOfNextMonth = new \DateTime(&amp;quot;first day of &amp;quot; . $this-&gt;yearMonth . &amp;quot; +1 month&amp;quot;);<br>
+          // 翌月1日が日曜日になったら処理を中断するwhile<br>
+          while ($firstDayOfNextMonth-&gt;format(&amp;quot;w&amp;quot;) &gt; 0) {<br>
+            $head .= sprintf(<br>
+              &amp;quot;&lt;td class='gray'&gt;%d&lt;/td&gt;&amp;quot;,<br>
+              $firstDayOfNextMonth-&gt;format(&amp;quot;d&amp;quot;)<br>
+            );<br>
+            // while 文なので加算処理必須<br>
+            $firstDayOfNextMonth-&gt;add(new \DateInterval(&amp;quot;P1D&amp;quot;));<br>
+          }<br>
+          return $head;<br>
+        }<br>
+      }<br>
+      <br>
+      /*<br>
+      try {<br>
+        // t がセットされていない、または日付形式が xxxx-xx でない場合の処理<br>
+        if(!isset($_GET[&amp;quot;t&amp;quot;]) || !preg_match(&amp;quot;/\A\d{4}-\d{2}\z/&amp;quot;, $_GET[&amp;quot;t&amp;quot;])) {<br>
+          throw new Exception();<br>
+        }<br>
+        $thisMonth = new DateTime($_GET[&amp;quot;t&amp;quot;]);<br>
+      } catch (Exception $e) {<br>
+        $thisMonth = new DateTime(&amp;quot;first day of this month&amp;quot;); // xampp だとこっち出る（?t=1985-01で改変可）<br>
+      }<br>
+      // var_dump($thisMonth);<br>
+      // exit;<br>
+      $dt = clone $thisMonth;<br>
+      $prev = $dt-&gt;modify(&amp;quot;-1 month&amp;quot;)-&gt;format(&amp;quot;Y-m&amp;quot;);<br>
+      $dt = clone $thisMonth;<br>
+      $next = $dt-&gt;modify(&amp;quot;+1 month&amp;quot;)-&gt;format(&amp;quot;Y-m&amp;quot;);<br>
+      <br>
+      // $t = &amp;quot;2020-06&amp;quot;;<br>
+      // $thisMonth = new DateTime($t); // 2020-05-01<br>
+      $yearMonth = $thisMonth-&gt;format(&amp;quot;F Y&amp;quot;);<br>
+      <br>
+      // 餞別の日付を追加する処理<br>
+      $tail = &amp;quot;&amp;quot;;<br>
+      // $lastDayOfPrevMonth = new DateTime(&amp;quot;last day of previous month&amp;quot;);<br>
+      $lastDayOfPrevMonth = new DateTime(&amp;quot;last day of &amp;quot; . $yearMonth . &amp;quot; -1 month&amp;quot;);<br>
+      while ($lastDayOfPrevMonth-&gt;format(&amp;quot;w&amp;quot;) &lt; 6) {<br>
+        $tail = sprintf(<br>
+          &amp;quot;&lt;td class='gray'&gt;%d&lt;/td&gt;&amp;quot;,<br>
+          $lastDayOfPrevMonth-&gt;format(&amp;quot;d&amp;quot;)<br>
+        ) . $tail;<br>
+        $lastDayOfPrevMonth-&gt;sub(new DateInterval(&amp;quot;P1D&amp;quot;));<br>
+      }<br>
+      <br>
+      $body = &amp;quot;&amp;quot;;<br>
+      <br>
+      // DatePeriod() 特定の機関の日付オブジェクトを作る<br>
+      $period = new DatePeriod(<br>
+        // new DateTime(&amp;quot;first day of this month&amp;quot;), // 文字列で。割と柔軟に解釈してくれる。<br>
+        new DateTime(&amp;quot;first day of &amp;quot; . $yearMonth),<br>
+        new DateInterval(&amp;quot;P1D&amp;quot;), // 日付間隔を1日ごとに<br>
+        // new DateTime(&amp;quot;first day of next month&amp;quot;) // 終わりの指定（翌月初日は含まない）<br>
+        new DateTime(&amp;quot;first day of &amp;quot; . $yearMonth . &amp;quot; +1 month&amp;quot;) // next month<br>
+      );<br>
+      <br>
+      $today = new DateTime(&amp;quot;today&amp;quot;);<br>
+      foreach ($period as $day) {<br>
+        // 7 の倍数時に行替えタグを挿入<br>
+        if ($day-&gt;format(&amp;quot;w&amp;quot;) % 7 === 0) {<br>
+          $body .= &amp;quot;&lt;/tr&gt;&lt;tr&gt;&amp;quot;;<br>
+        }<br>
+        $todayClass = ($day-&gt;format(&amp;quot;Y-m-d&amp;quot;) === $today-&gt;format(&amp;quot;Y-m-d&amp;quot;)) ? &amp;quot;today&amp;quot; : &amp;quot;&amp;quot;;<br>
+      <br>
+        // format() は 変数の値を任意の書式で表示する。「d = 01 to 31, j = 1 to 31, w = 曜日 0 to 6, m = 月 1 to 12, M = 月 Jan to Dec, 詳しくは[https://www.php.net/manual/ja/function.date.php]<br>
+        $body .= sprintf(<br>
+          // &amp;quot;&lt;td class='youbi_%d'&gt;%d&lt;/td&gt;&amp;quot;, [%s] が抜けていたため、カレンダーの数字が全て 0 になってしまった。%s は文字列指定のはずだけど、これがないと何で0になるのか……%d が足りないならまだわかるんだけど。<br>
+          &amp;quot;&lt;td class='youbi_%d %s'&gt;%d&lt;/td&gt;&amp;quot;,<br>
+          $day-&gt;format(&amp;quot;w&amp;quot;),<br>
+          $todayClass, $day-&gt;format(&amp;quot;d&amp;quot;) // JS と違って最後にカンマ入れるとバグる<br>
+        );<br>
+      }<br>
+      <br>
+      // $firstDayOfNextMonth = new DateTime(&amp;quot;first day of next month&amp;quot;);<br>
+      $firstDayOfNextMonth = new DateTime(&amp;quot;first day of &amp;quot; . $yearMonth . &amp;quot; +1 month&amp;quot;);<br>
+      <br>
+      $head = &amp;quot;&amp;quot;;<br>
+      // 翌月1日が日曜日になったら処理を中断するwhile<br>
+      while ($firstDayOfNextMonth-&gt;format(&amp;quot;w&amp;quot;) &gt; 0) {<br>
+        $head .= sprintf(<br>
+          &amp;quot;&lt;td class='gray'&gt;%d&lt;/td&gt;&amp;quot;,<br>
+          $firstDayOfNextMonth-&gt;format(&amp;quot;d&amp;quot;)<br>
+        );<br>
+        // while 文なので加算処理必須<br>
+        $firstDayOfNextMonth-&gt;add(new DateInterval(&amp;quot;P1D&amp;quot;));<br>
+      }<br>
+      <br>
+      $html = &amp;quot;&lt;tr&gt;&amp;quot; . $tail . $body . $head . &amp;quot;&lt;/tr&gt;&amp;quot;;<br>
+      */</p>
+</body>
+</html>
